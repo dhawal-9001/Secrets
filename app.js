@@ -1,12 +1,14 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
-const md5 = require("md5");
+const bcrypt = require('bcrypt');
 require("dotenv").config()
 
 
 const Schema = mongoose.Schema;
 const port = 3000;
+const saltRounds = 10;
+const secret = process.env.SECRET;
 const app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + "/public"))
@@ -40,29 +42,45 @@ app.get("/login", (req, res) => {
     res.render("login")
 })
 app.post("/register", (req, res) => {
-    const newUser = User({
-        email: req.body.email,
-        password: md5(req.body.password),
-    })
-    newUser.save((err) => {
-        if (err) {
-            res.send(err)
-        } else
-            res.redirect("/login")
-    })
+    bcrypt.hash(req.body.password, saltRounds, (err, hash) => {
+        if (!err) {
+
+            const newUser = User({
+                email: req.body.email,
+                password: hash,
+            })
+            newUser.save((err) => {
+                if (err) {
+                    res.send(err)
+                } else
+                    res.redirect("/login")
+            })
+        }
+        else {
+            console.log('Something went wrong')
+            res.render("register")   
+        }
+    });
 })
 app.post("/login", (req, res) => {
     User.findOne({ email: req.body.email }, (err, foundUser) => {
         if (foundUser) {
             console.log('user found')
-            if (foundUser.password === md5(req.body.password)) {
-                console.log('password matched')
-                res.render("secrets");
-            }
-            else {
-                console.log('password not matched')
-                res.render('login')
-            }
+            bcrypt.compare(req.body.password, foundUser.password, (err, matched) => {
+                if(err) {
+                    console.log('Something went wrong')
+                    res.render("login")
+                }
+                if (matched) {
+                        console.log('password matched')
+                        res.render("secrets");
+                    }
+                    else {
+                        console.log('password not matched')
+                        res.render('login')
+                    }
+                
+            });
         }
         else {
             console.log('user not found')
