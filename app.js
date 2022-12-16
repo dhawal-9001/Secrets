@@ -1,21 +1,28 @@
+require("dotenv").config()
 const express = require("express");
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
-const bcrypt = require('bcrypt');
-require("dotenv").config()
+const session = require('express-session');
+const passport = require("passport")
+const passportLocalMongoose = require("passport-local-mongoose")
 
 
 const Schema = mongoose.Schema;
 const port = 3000;
-const saltRounds = 10;
-const secret = process.env.SECRET;
 const app = express();
+
+app.set("view engine", "ejs")
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + "/public"))
-app.set("view engine", "ejs")
+app.use(session({
+    secret: process.env.SECRET,
+    resave: false,
+    saveUninitialized: false
+}))
+app.use(passport.initialize());
+app.use(passport.session());
 
-
-
+mongoose.set('strictQuery', false);
 mongoose.connect("mongodb://localhost:27017/whisper", { useNewUrlParser: true }, (err) => {
     if (err) {
         throw err;
@@ -25,66 +32,111 @@ mongoose.connect("mongodb://localhost:27017/whisper", { useNewUrlParser: true },
 })
 
 
+
 const userSchema = new Schema({
-    email: String,
+    username: String,
     password: String,
 });
+userSchema.plugin(passportLocalMongoose)
 const User = mongoose.model("User", userSchema);
+passport.use(User.createStrategy());
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
 
 
 app.get("/", (req, res) => {
-    res.render("home")
+    if (req.isAuthenticated()) {
+        console.log("already authentiocated redirecting to secrets");
+        res.redirect("/secrets")
+    } else {
+        console.log(" not authentiocated redirecting to home");
+        res.render("home")
+    }
 })
-app.get("/register", (req, res) => {
-    res.render("register")
-})
-app.get("/login", (req, res) => {
-    res.render("login")
-})
-app.post("/register", (req, res) => {
-    bcrypt.hash(req.body.password, saltRounds, (err, hash) => {
-        if (!err) {
 
-            const newUser = User({
-                email: req.body.email,
-                password: hash,
-            })
-            newUser.save((err) => {
-                if (err) {
-                    res.send(err)
-                } else
-                    res.redirect("/login")
+app.get("/register", (req, res) => {
+    if (req.isAuthenticated()) {
+        console.log("already authentiocated redirecting to secrets");
+        res.redirect("/secrets")
+    } else {
+        console.log(" not authentiocated redirecting to register");
+        res.render("register")
+    }
+})
+
+app.get("/login", (req, res) => {
+    if (req.isAuthenticated()) {
+        console.log("already authentiocated redirecting to secrets");
+        res.redirect("/secrets")
+    } else {
+        console.log(" not authentiocated redirecting to login");
+        res.render("login")
+    }
+})
+
+app.get("/secrets", (req, res) => {
+    if (req.isAuthenticated()) {
+        res.render("secrets");
+    }
+    else {
+        console.log(" not authentiocated redirecting to login");
+        res.redirect("/login")
+    }
+})
+app.get("/submit", (req, res) => {
+    if (req.isAuthenticated()) {
+        res.render("submit");
+    }
+    else {
+        console.log(" not authentiocated redirecting to login");
+        res.redirect("/login")
+    }
+})
+app.get("/logout", (req, res) => {
+    if (req.isAuthenticated) {
+        req.logout((err) => {
+            if (err) {
+                console.log("error logging out \n", err);
+                res.redirect('/secrets')
+            }
+            else {
+                console.log("Logged out, redirecting to home page");
+                res.redirect("/")
+            }
+        });
+    }
+})
+
+app.post("/register", (req, res) => {
+    User.register({ username: req.body.username }, req.body.password, (err, user) => {
+        if (err) {
+            console.log({ message: "some error occured redirecting to register", err });
+            res.redirect("/register")
+        }
+        if (user) {
+            console.log(user)
+            passport.authenticate("local")(req, res, () => {
+                console.log("authenticated redirecting to /secrets");
+                res.redirect("/secrets");
             })
         }
-        else {
-            console.log('Something went wrong')
-            res.render("register")   
-        }
-    });
+    })
 })
 app.post("/login", (req, res) => {
-    User.findOne({ email: req.body.email }, (err, foundUser) => {
-        if (foundUser) {
-            console.log('user found')
-            bcrypt.compare(req.body.password, foundUser.password, (err, matched) => {
-                if(err) {
-                    console.log('Something went wrong')
-                    res.render("login")
-                }
-                if (matched) {
-                        console.log('password matched')
-                        res.render("secrets");
-                    }
-                    else {
-                        console.log('password not matched')
-                        res.render('login')
-                    }
-                
-            });
+    const user = new User({
+        username: req.body.username,
+        password: req.body.password
+    })
+    req.logIn(user, (err) => {
+        if (err) {
+            console.log({ "message": "Some error loging in, redirecting to login page", err })
+            res.redirect("/login")
         }
         else {
-            console.log('user not found')
-            res.render("login")
+            passport.authenticate("local")(req, res, () => {
+                console.log("authenticated redirecting to secrets page");
+                res.redirect("/secrets");
+            })
         }
     })
 })
