@@ -7,10 +7,10 @@ const passport = require("passport")
 const passportLocalMongoose = require("passport-local-mongoose")
 const findOrCreate = require("mongoose-findorcreate")
 const googleStrategy = require('passport-google-oauth20').Strategy;
-const flash=require("express-flash")
+// const flash=require("express-flash")
 
 const Schema = mongoose.Schema;
-const port = 3000;
+const port = 3000 || process.env.PORT;
 const app = express();
 
 app.set("view engine", "ejs")
@@ -72,7 +72,7 @@ passport.use(new googleStrategy({
         User.findOne({ username: profile.emails[0].value }, (err, user) => {
             if (err) {
                 console.log("Some err occured while finding \n", err)
-                req.flash("Some err occured while finding \n", err)
+                // req.flash("Some err occured while finding \n", err)
                 return cb(err)
             }
             if (!user) {
@@ -252,14 +252,14 @@ app.post("/login", (req, res) => {
     req.logIn(user, (err) => {
         if (err) {
             console.log({ "message": "Some error loging in, redirecting to login page", err })
-            req.flash({ "message": "Some error loging in, redirecting to login page", err })
+            // req.flash({ "message": "Some error loging in, redirecting to login page", err })
             res.redirect("/login")
         }
         else {
             passport.authenticate("local")(req, res, (err) => {
                 if (err) {
                     console.log({ "message": "Some error loging in, redirecting to login page", err })
-                    req.flash({ "message": "Some error loging in, redirecting to login page", err })
+                    // req.flash({ "message": "Some error loging in, redirecting to login page", err })
                     res.render("login")
                 }
                 else {
@@ -308,7 +308,7 @@ app.post("/account", (req, res) => {
             req.user.changePassword(oldPassword,
                 req.body.new_password, function (err) {
                     if (err) {
-                        req.flash("Some error occured\n", err)
+                        // req.flash("Some error occured\n", err)
                         console.log("Some error occured\n", err)
                         res.redirect("/account ")
                     } else {
