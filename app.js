@@ -23,7 +23,7 @@ app.use(session({
 }))
 app.use(passport.initialize());
 app.use(passport.session());
-app.use(flash())
+// app.use(flash())
 
 mongoose.set('strictQuery', false);
 mongoose.connect("mongodb://localhost:27017/whisper", { useNewUrlParser: true }, (err) => {
